@@ -1,0 +1,159 @@
+"""
+Train PPO Agent.
+
+PPO training script for the grid navigation task.
+Mirrors the interface of train.py but uses a timestep-based
+training loop suited to PPO's rollout buffer design.
+
+Usage:
+    python train_ppo.py grid_configs/example_grid.npy --no_gui --iter 500000
+"""
+
+from argparse import ArgumentParser
+from pathlib import Path
+from agents.ppo_config import MAX_EPISODE_STEPS
+import torch
+
+from reward_functions import shaped_reward
+from world import Environment
+from agents.ppo_agent import PPOAgent
+
+
+def parse_args():
+    p = ArgumentParser(description="DIC Reinforcement Learning Trainer (PPO).")
+    p.add_argument("GRID", type=Path, nargs="+",
+                   help="Paths to the grid file to use. There can be more than "
+                        "one.")
+    p.add_argument("--no_gui", action="store_true",
+                   help="Disables rendering to train faster.")
+    p.add_argument("--sigma", type=float, default=0.1,
+                   help="Sigma value for the stochasticity of the environment.")
+    p.add_argument("--fps", type=int, default=30,
+                   help="Frames per second to render at. Only used if "
+                        "no_gui is not set.")
+    p.add_argument("--iter", type=int, default=500_000,
+                   help="Total number of timesteps to train for.")
+    p.add_argument("--random_seed", type=int, default=0,
+                   help="Random seed value for the environment.")
+    p.add_argument("--start_pos", type=str, default=None,
+                   help="Agent start position as row,col (e.g. 2,3). "
+                        "If not set, the GUI lets you click to place it. "
+                        "In no_gui mode, defaults to random placement.")
+    return p.parse_args()
+
+
+def main(grid_paths: list[Path], no_gui: bool, total_timesteps: int, fps: int,
+         sigma: float, random_seed: int, start_pos: tuple[int, int] | None):
+    """Main loop of the program."""
+
+    for grid in grid_paths:
+
+        print(f"\nTraining on grid: {grid}")
+        print(f"Total timesteps: {total_timesteps:,}")
+
+        # Set up the environment
+        env = Environment(grid, no_gui, sigma=sigma, target_fps=fps,
+                          agent_start_pos=start_pos,
+                          reward_fn=shaped_reward,  # Use shaped reward
+                          random_seed=random_seed)
+
+        # Reset before constructing the agent so env.grid.shape is available
+        state = env.reset()
+        initial_pos = env.agent_pos
+
+        # Initialize PPO agent with actual grid dimensions
+        agent = PPOAgent(grid_shape=env.grid.shape)
+
+        # --- Training loop ---
+        # PPO is trained over total timesteps, not episodes.
+        # The rollout buffer accumulates steps and triggers a PPO update
+        # every TRAJECTORY_LENGTH steps (defined in ppo_config.py).
+
+        timestep = 0
+        episode = 0
+        episode_reward = 0.0
+        episode_steps = 0
+        episode_rewards = []  # store per-episode returns for analysis
+
+        while timestep < total_timesteps:
+
+            action = agent.take_action(state, grid=env.grid)
+            state, reward, terminated, info = env.step(action)
+            episode_steps += 1
+            
+            truncated = episode_steps >= MAX_EPISODE_STEPS
+            done = terminated or truncated
+            
+            agent.update(state, reward, action, done=done, grid=env.grid)
+
+            timestep += 1
+            episode_reward += reward
+
+            if done:
+                episode += 1
+                episode_rewards.append(episode_reward)
+
+                # Print progress every 10 episodes
+                if episode % 10 == 0:
+                    avg_reward = sum(episode_rewards[-10:]) / min(10, len(episode_rewards))
+                    print(f"  Timestep {timestep:>8,} | Episode {episode:>5} | "
+                          f"Return: {episode_reward:>8.1f} | "
+                          f"Avg (last 10): {avg_reward:>8.1f} | "
+                          f"PPO updates: {agent.update_count}")
+
+                episode_reward = 0.0
+                episode_steps = 0
+                state = env.reset()
+                
+
+        print(f"\nTraining complete. Total episodes: {episode}, "
+              f"PPO updates: {agent.update_count}")
+
+        # --- Save model ---
+        out_dir = Path("out")
+        out_dir.mkdir(exist_ok=True)
+        save_path = out_dir / f"ppo_{grid.stem}_seed{random_seed}.pt"
+        torch.save({
+            'actor': agent.actor.state_dict(),
+            'critic': agent.critic.state_dict(),
+            'update_count': agent.update_count,
+            'episode_rewards': episode_rewards,
+        }, save_path)
+        print(f"Model saved to {save_path}")
+
+        # # --- Evaluation ---
+        # # Evaluate the trained agent without learning (no update() calls).
+        # Environment.evaluate_agent(grid, agent, total_timesteps, sigma,
+        #                            agent_start_pos=initial_pos,
+        #                            random_seed=random_seed)
+        
+        # --- Evaluation ---
+        print("\nEvaluating agent...")
+        eval_env = Environment(grid, no_gui=True, sigma=sigma,
+                            agent_start_pos=initial_pos,
+                            reward_fn=shaped_reward,
+                            random_seed=random_seed)
+        eval_state = eval_env.reset()
+        total_reward = 0.0
+
+        for step in range(500):
+            action = agent.take_action(eval_state, grid=eval_env.grid)
+            eval_state, reward, terminated, info = eval_env.step(action)
+            total_reward += reward
+            if terminated:
+                break
+
+        print(f"Evaluation complete.")
+        print(f"  Total reward: {total_reward:.1f}")
+        print(f"  Steps taken: {step + 1}")
+        print(f"  Target reached: {terminated}")
+
+
+if __name__ == '__main__':
+    args = parse_args()
+    start_pos = None
+    if args.start_pos is not None:
+        parts = args.start_pos.split(',')
+        start_pos = (int(parts[0]), int(parts[1]))
+    main(args.GRID, args.no_gui, args.iter, args.fps, args.sigma,
+         args.random_seed, start_pos)
