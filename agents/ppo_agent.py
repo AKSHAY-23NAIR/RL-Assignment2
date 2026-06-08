@@ -15,8 +15,9 @@ from agents.ppo_config import (
     LEARNING_RATE_ACTOR, LEARNING_RATE_CRITIC, EPSILON_CLIP,
     EPOCHS_PER_UPDATE, BATCH_SIZE, TRAJECTORY_LENGTH,
     GAMMA, GAE_LAMBDA, HIDDEN_SIZE, STATE_DIM, ACTION_DIM,
-    ENTROPY_COEFF
+    ENTROPY_COEFF, USE_ACTION_MASKING
 )
+from world.helpers import ACTIONS_TO_DIRECTIONS
 
 
 class PPOAgent(BaseAgent):
@@ -48,6 +49,7 @@ class PPOAgent(BaseAgent):
         self.values = deque(maxlen=TRAJECTORY_LENGTH)
         self.log_probs = deque(maxlen=TRAJECTORY_LENGTH)
         self.dones = deque(maxlen=TRAJECTORY_LENGTH)
+        self.action_masks = deque(maxlen=TRAJECTORY_LENGTH)
         
         self.trajectory_step = 0
         self.update_count = 0
@@ -102,39 +104,10 @@ class PPOAgent(BaseAgent):
                         blocked += 1
         return blocked / total if total > 0 else 0.0
 
-    def _get_target_quadrant(self, grid: np.ndarray, row: int, col: int) -> np.ndarray:
-        """Return a 4-element binary vector indicating which cardinal quadrant(s)
-        the nearest target lies in relative to the agent.
-
-        Vector layout: [north, south, east, west]
-        A quadrant flag is 1 if the target is in that direction, 0 otherwise.
-        If no target exists (all collected), returns [0, 0, 0, 0].
-
-        Args:
-            grid:      Current grid array.
-            row, col:  Agent position.
-        """
-        target_positions = np.argwhere(grid == 3)
-        if len(target_positions) == 0:
-            return np.zeros(4, dtype=np.float32)
-
-        # Find nearest target by Manhattan distance
-        distances = np.abs(target_positions[:, 0] - row) + \
-                    np.abs(target_positions[:, 1] - col)
-        nearest = target_positions[np.argmin(distances)]
-        t_row, t_col = nearest
-
-        north = 1.0 if t_row < row else 0.0  # target is above (smaller row)
-        south = 1.0 if t_row > row else 0.0
-        east  = 1.0 if t_col > col else 0.0
-        west  = 1.0 if t_col < col else 0.0
-
-        return np.array([north, south, east, west], dtype=np.float32)
-
     def _build_state(self, agent_pos: tuple[int, int], grid: np.ndarray) -> np.ndarray:
         """Build the full state vector from agent position and grid.
 
-        State layout (10 values):
+        State layout (7 values):
             [0]  normalised row position
             [1]  normalised col position
             [2]  sensor facing north  (up,    d_row=-1)
@@ -142,10 +115,6 @@ class PPOAgent(BaseAgent):
             [4]  sensor facing east   (right, d_col=+1)
             [5]  sensor facing west   (left,  d_col=-1)
             [6]  local obstacle density (radius-2 neighbourhood)
-            [7]  target quadrant north
-            [8]  target quadrant south
-            [9]  target quadrant east
-            [10] target quadrant west
 
         All values are in [0, 1].
 
@@ -171,14 +140,10 @@ class PPOAgent(BaseAgent):
         # Local obstacle density
         density = self._get_obstacle_density(grid, row, col, radius=2)
 
-        # Target quadrant
-        quadrant = self._get_target_quadrant(grid, row, col)
-
         state = np.array([
             norm_row, norm_col,
             sensor_north, sensor_south, sensor_east, sensor_west,
             density,
-            quadrant[0], quadrant[1], quadrant[2], quadrant[3],
         ], dtype=np.float32)
 
         return state
@@ -190,33 +155,72 @@ class PPOAgent(BaseAgent):
         with torch.no_grad():
             value = self.critic(state_tensor)
         return value.detach().cpu().numpy().flatten()[0]
+
+    def _get_action_mask(self, agent_pos: tuple[int, int],
+                         grid: np.ndarray) -> np.ndarray:
+        """Return which actions are physically valid from the current cell."""
+        if not USE_ACTION_MASKING:
+            return np.ones(ACTION_DIM, dtype=bool)
+
+        mask = np.ones(ACTION_DIM, dtype=bool)
+        for action, direction in ACTIONS_TO_DIRECTIONS.items():
+            next_pos = (agent_pos[0] + direction[0],
+                        agent_pos[1] + direction[1])
+            out_of_bounds = (
+                next_pos[0] < 0 or next_pos[0] >= self.grid_rows or
+                next_pos[1] < 0 or next_pos[1] >= self.grid_cols
+            )
+            if out_of_bounds or grid[next_pos] in (1, 2):
+                mask[action] = False
+
+        if not mask.any():
+            mask[:] = True
+        return mask
+
+    @staticmethod
+    def _masked_logits(logits: torch.Tensor,
+                       action_mask: torch.Tensor) -> torch.Tensor:
+        """Set invalid action logits very low before constructing a policy."""
+        return logits.masked_fill(~action_mask, -1e9)
     
-    def take_action(self, state: tuple[int, int], grid: np.ndarray = None) -> int:
+    def take_action(self, state: tuple[int, int], grid: np.ndarray = None,
+                    store: bool = True, deterministic: bool = False) -> int:
         """Select action using the policy network.
         
         Args:
             state: Current agent position (row, col).
             grid:  Current grid array (required for rich state).
+            store: Whether to store the transition data for PPO training.
+            deterministic: Choose the most likely action instead of sampling.
             
         Returns:
             Action (0-3).
         """
+        if grid is None:
+            raise ValueError("PPOAgent.take_action requires the current grid.")
+
         state_vec = self._build_state(state, grid)
+        action_mask = self._get_action_mask(state, grid)
         state_tensor = torch.FloatTensor(state_vec).unsqueeze(0).to(self.device)
+        mask_tensor = torch.BoolTensor(action_mask).unsqueeze(0).to(self.device)
         
         with torch.no_grad():
             action_logits = self.actor(state_tensor)
-            action_probs = torch.softmax(action_logits, dim=-1)
-            action_dist = torch.distributions.Categorical(action_probs)
-            action = action_dist.sample()
+            masked_logits = self._masked_logits(action_logits, mask_tensor)
+            action_dist = torch.distributions.Categorical(logits=masked_logits)
+            if deterministic:
+                action = torch.argmax(masked_logits, dim=-1)
+            else:
+                action = action_dist.sample()
             log_prob = action_dist.log_prob(action)
             value = self.critic(state_tensor)
         
-        # Store trajectory data
-        self.states.append(state_vec)
-        self.actions.append(action.item())
-        self.log_probs.append(log_prob.detach().cpu().numpy())
-        self.values.append(value.detach().cpu().numpy().flatten()[0])
+        if store:
+            self.states.append(state_vec)
+            self.actions.append(action.item())
+            self.log_probs.append(log_prob.detach().cpu().numpy())
+            self.values.append(value.detach().cpu().numpy().flatten()[0])
+            self.action_masks.append(action_mask)
         
         return action.item()
     
@@ -253,8 +257,9 @@ class PPOAgent(BaseAgent):
             else:
                 next_val = self.values[t + 1]
             
-            delta = self.rewards[t] + GAMMA * next_val * (1 - float(self.dones[t])) - self.values[t]
-            gae = delta + GAMMA * GAE_LAMBDA * gae
+            mask = 1.0 - float(self.dones[t])
+            delta = self.rewards[t] + GAMMA * next_val * mask - self.values[t]
+            gae = delta + GAMMA * GAE_LAMBDA * mask * gae
             advantages[t] = gae
             returns[t] = gae + self.values[t]
         
@@ -270,6 +275,7 @@ class PPOAgent(BaseAgent):
         states = torch.FloatTensor(np.array(list(self.states))).to(self.device)
         actions = torch.LongTensor(np.array(list(self.actions))).to(self.device)
         old_log_probs = torch.FloatTensor(np.array(list(self.log_probs))).to(self.device)
+        action_masks = torch.BoolTensor(np.array(list(self.action_masks))).to(self.device)
 
         advantages, returns = self._compute_advantages(next_value)
         advantages = torch.FloatTensor(advantages).to(self.device)
@@ -285,11 +291,13 @@ class PPOAgent(BaseAgent):
                 batch_old_log_probs = old_log_probs[batch_indices]
                 batch_advantages = advantages[batch_indices]
                 batch_returns = returns[batch_indices]
+                batch_action_masks = action_masks[batch_indices]
                 
                 # Actor update
                 action_logits = self.actor(batch_states)
-                action_probs = torch.softmax(action_logits, dim=-1)
-                action_dist = torch.distributions.Categorical(action_probs)
+                masked_logits = self._masked_logits(action_logits,
+                                                    batch_action_masks)
+                action_dist = torch.distributions.Categorical(logits=masked_logits)
                 new_log_probs = action_dist.log_prob(batch_actions)
                 entropy = action_dist.entropy().mean()
                 
@@ -318,6 +326,7 @@ class PPOAgent(BaseAgent):
         self.values.clear()
         self.log_probs.clear()
         self.dones.clear()
+        self.action_masks.clear()
         
         self.update_count += 1
 
