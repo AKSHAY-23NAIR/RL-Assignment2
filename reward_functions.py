@@ -17,13 +17,13 @@ def default_reward(grid, agent_pos) -> float:
 
 
 def shaped_reward(grid, agent_pos) -> float:
-    """Denser reward for faster learning on larger grids."""
+    """Scaled reward for PPO training."""
     match grid[agent_pos]:
         case 0:
-            return -0.1
+            return -0.02
         case 1 | 2:
-            return -5
+            return -1
         case 3:
-            return 100
+            return 20
         case _:
             raise ValueError(f"Unexpected grid value at {agent_pos}")
