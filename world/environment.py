@@ -256,7 +256,7 @@ class Environment:
                 pass
             case 3:  # Moved to a target tile
                 self.agent_pos = new_pos
-                self.grid[new_pos] = 0
+                self._clear_connected_target(new_pos)
                 if np.sum(self.grid == 3) == 0:
                     self.terminal_state = True
                 self.info["target_reached"] = True
@@ -268,6 +268,26 @@ class Environment:
                 raise ValueError(f"Grid is badly formed. It has a value of "
                                  f"{self.grid[new_pos]} at position "
                                  f"{new_pos}.")
+
+    def _clear_connected_target(self, target_pos: tuple[int, int]):
+        """Clears all connected target cells from the reached target."""
+        stack = [target_pos]
+        seen = set()
+
+        while stack:
+            pos = stack.pop()
+            if pos in seen or self.grid[pos] != 3:
+                continue
+
+            seen.add(pos)
+            self.grid[pos] = 0
+
+            row, col = pos
+            for next_pos in ((row + 1, col), (row - 1, col),
+                             (row, col + 1), (row, col - 1)):
+                if (0 <= next_pos[0] < self.grid.shape[0]
+                        and 0 <= next_pos[1] < self.grid.shape[1]):
+                    stack.append(next_pos)
         
 
     def step(self, action: int) -> tuple[np.ndarray, float, bool]:
