@@ -13,3 +13,15 @@ no_novelty,A1_grid,2,500000,489,1638,7.626000000000056,1.0,18.5608,30.82,out\ppo
 long_rollout,A1_grid,0,500000,123,1676,9.717200000000041,1.0,18.44,30.98,out\ppo_experiments\ppo_long_rollout_A1_grid_seed0.pt
 long_rollout,A1_grid,1,500000,123,1634,9.366400000000041,1.0,18.52,30.9,out\ppo_experiments\ppo_long_rollout_A1_grid_seed1.pt
 long_rollout,A1_grid,2,500000,123,1671,9.526400000000038,1.0,18.539199999999997,32.88,out\ppo_experiments\ppo_long_rollout_A1_grid_seed2.pt
+full,restaurant_delivery_grid,0,200000,196,2137,17.766,1.0,19.761200000000002,10.0,out\ppo_experiments\ppo_full_restaurant_delivery_grid_seed0.pt
+full,restaurant_delivery_grid,1,200000,196,2106,17.692800000000005,1.0,19.76,10.06,out\ppo_experiments\ppo_full_restaurant_delivery_grid_seed1.pt
+full,restaurant_delivery_grid,2,200000,196,2379,18.646400000000003,1.0,19.738400000000002,11.14,out\ppo_experiments\ppo_full_restaurant_delivery_grid_seed2.pt
+no_action_mask,restaurant_delivery_grid,0,200000,196,1316,-5.5375999999999985,1.0,19.7604,10.04,out\ppo_experiments\ppo_no_action_mask_restaurant_delivery_grid_seed0.pt
+no_action_mask,restaurant_delivery_grid,1,200000,196,1238,-9.42560000000003,1.0,19.76,10.06,out\ppo_experiments\ppo_no_action_mask_restaurant_delivery_grid_seed1.pt
+no_action_mask,restaurant_delivery_grid,2,200000,196,1275,-5.498800000000024,1.0,19.760000000000005,10.06,out\ppo_experiments\ppo_no_action_mask_restaurant_delivery_grid_seed2.pt
+no_novelty,restaurant_delivery_grid,0,200000,196,2381,17.9004,1.0,19.7604,10.04,out\ppo_experiments\ppo_no_novelty_restaurant_delivery_grid_seed0.pt
+no_novelty,restaurant_delivery_grid,1,200000,196,1983,17.278400000000005,1.0,19.76,10.06,out\ppo_experiments\ppo_no_novelty_restaurant_delivery_grid_seed1.pt
+no_novelty,restaurant_delivery_grid,2,200000,196,2217,17.228400000000004,1.0,19.7376,11.18,out\ppo_experiments\ppo_no_novelty_restaurant_delivery_grid_seed2.pt
+long_rollout,restaurant_delivery_grid,0,200000,49,2699,18.277599999999996,1.0,19.736,11.26,out\ppo_experiments\ppo_long_rollout_restaurant_delivery_grid_seed0.pt
+long_rollout,restaurant_delivery_grid,1,200000,49,2329,17.842,1.0,19.736800000000002,11.22,out\ppo_experiments\ppo_long_rollout_restaurant_delivery_grid_seed1.pt
+long_rollout,restaurant_delivery_grid,2,200000,49,2699,18.369600000000002,1.0,19.760000000000005,10.06,out\ppo_experiments\ppo_long_rollout_restaurant_delivery_grid_seed2.pt
