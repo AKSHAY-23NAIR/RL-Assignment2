@@ -1,0 +1,15 @@
+variant,grid,seed,timesteps,updates,episodes,final_avg_50,success_rate,avg_eval_reward,avg_eval_steps,checkpoint
+full,A1_grid,0,200000,196,514,1.5792000000000757,0.35,-6.782999999999876,393.05,out\ppo_experiments\ppo_full_A1_grid_seed0.pt
+full,A1_grid,0,200000,196,514,1.5792000000000757,0.32,-8.393599999999877,414.64,out\ppo_experiments\ppo_full_A1_grid_seed0.pt
+full,A1_grid,0,500000,489,1600,9.607200000000036,1.0,18.578400000000002,30.92,out\ppo_experiments\ppo_full_A1_grid_seed0.pt
+full,A1_grid,1,500000,489,1613,10.328400000000038,1.0,18.52,30.9,out\ppo_experiments\ppo_full_A1_grid_seed1.pt
+full,A1_grid,2,500000,489,1640,7.536400000000036,1.0,18.5784,30.92,out\ppo_experiments\ppo_full_A1_grid_seed2.pt
+no_action_mask,A1_grid,0,500000,489,1053,-112.54199999999986,0.0,-16.311199999999843,500.0,out\ppo_experiments\ppo_no_action_mask_A1_grid_seed0.pt
+no_action_mask,A1_grid,1,500000,489,1044,-114.63079999999972,0.0,-16.389599999999845,500.0,out\ppo_experiments\ppo_no_action_mask_A1_grid_seed1.pt
+no_action_mask,A1_grid,2,500000,489,1035,-122.3379999999998,0.0,-16.448399999999843,500.0,out\ppo_experiments\ppo_no_action_mask_A1_grid_seed2.pt
+no_novelty,A1_grid,0,500000,489,1644,9.383200000000045,1.0,18.578400000000002,30.92,out\ppo_experiments\ppo_no_novelty_A1_grid_seed0.pt
+no_novelty,A1_grid,1,500000,489,1580,6.360400000000063,1.0,18.2344,34.4,out\ppo_experiments\ppo_no_novelty_A1_grid_seed1.pt
+no_novelty,A1_grid,2,500000,489,1638,7.626000000000056,1.0,18.5608,30.82,out\ppo_experiments\ppo_no_novelty_A1_grid_seed2.pt
+long_rollout,A1_grid,0,500000,123,1676,9.717200000000041,1.0,18.44,30.98,out\ppo_experiments\ppo_long_rollout_A1_grid_seed0.pt
+long_rollout,A1_grid,1,500000,123,1634,9.366400000000041,1.0,18.52,30.9,out\ppo_experiments\ppo_long_rollout_A1_grid_seed1.pt
+long_rollout,A1_grid,2,500000,123,1671,9.526400000000038,1.0,18.539199999999997,32.88,out\ppo_experiments\ppo_long_rollout_A1_grid_seed2.pt
