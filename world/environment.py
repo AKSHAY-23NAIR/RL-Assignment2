@@ -335,7 +335,7 @@ class Environment:
         
         # Make the move
         self.info["actual_action"] = actual_action
-        direction = action_to_direction(actual_action)    
+        direction = action_to_direction(actual_action)
         new_pos = (self.agent_pos[0] + direction[0], self.agent_pos[1] + direction[1])
 
         # Calculate the reward for the agent
