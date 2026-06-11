@@ -1,5 +1,6 @@
 """
 Run DQN experiments over grids, seeds, and ablation variants.
+Mirrors run_ppo_experiments.py so that results are comparable
 
 Examples:
     python run_dqn_experiments.py --grids grid_configs/A1_grid.npy grid_configs/restaurant_delivery_grid.npy --iter 200000
@@ -18,7 +19,32 @@ import numpy as np
 import agents.dqn_config as dqn_config
 from reward_functions import shaped_reward
 
+#Ablation variants
+#Each variant changes one thing from full config
+#Isolates the contribution of each component 
 
+BASE_CONFIG: dict[str, Any] = {
+    "LEARNING_RATE":      dqn_config.LEARNING_RATE,
+    "GAMMA":              dqn_config.GAMMA,
+    "EPSILON_START":      dqn_config.EPSILON_START,
+    "EPSILON_END":        dqn_config.EPSILON_END,
+    "EPSILON_DECAY":      dqn_config.EPSILON_DECAY,
+    "BUFFER_SIZE":        dqn_config.BUFFER_SIZE,
+    "BATCH_SIZE":         dqn_config.BATCH_SIZE,
+    "WARMUP_STEPS":       dqn_config.WARMUP_STEPS,
+    "TARGET_UPDATE_FREQ": dqn_config.TARGET_UPDATE_FREQ,
+    "HIDDEN_SIZE":        dqn_config.HIDDEN_SIZE,
+    "STATE_DIM":          dqn_config.STATE_DIM,
+    "ACTION_DIM":         dqn_config.ACTION_DIM,
+    "NOVELTY_BONUS":      dqn_config.NOVELTY_BONUS,
+    "MAX_EPISODE_STEPS":  dqn_config.MAX_EPISODE_STEPS,
+}
+
+VARIANTS: dict[str, dict[str, Any]] = {
+    "full": {},
+    "no_novelty": {"NOVELTY_BONUS": 0.0}, #to test if exploration bonus helps DQN 
+    "high_sigma": {}, #high stochasticity robustness test, sigma is set at environment level but document here 
+}
 
 @dataclass
 class ExperimentResult:
@@ -39,6 +65,9 @@ def parse_args():
     p.add_argument("--grids", type=Path, nargs="+",
                    default=[Path("grid_configs/A1_grid.npy")],
                    help="Grid files to train/evaluate on.")
+    p.add_argument("--variants", nargs="+", choices=sorted(VARIANTS), 
+                   default=["full", "no_novelty"], 
+                   help="DQN variants/ablations to run.")
 
     p.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2],
                    help="Random seeds to run.")
@@ -66,6 +95,13 @@ def set_random_seeds(seed: int):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
+def apply_variant(variant: str):
+    # reset to base
+    for key, value in BASE_CONFIG.items():
+        setattr(dqn_config, key, value)
+    # apply overrides
+    for key, value in VARIANTS[variant].items():
+        setattr(dqn_config, key, value)
 
 def parse_start_pos(raw: str | None) -> tuple[int, int] | None:
     if raw is None:
@@ -78,9 +114,9 @@ def evaluate_agent(agent, grid: Path, sigma: float, start_pos: tuple[int, int] |
                    seed: int, eval_episodes: int) -> tuple[float, float, float]:
     from world import Environment
 
-    current_epsilon = getattr(agent, "epsilon", None)
-    if current_epsilon is not None:
-        agent.epsilon = 0.0
+    # disable exploration during evaluation
+    saved_epsilon = agent.epsilon
+    agent.epsilon = 0.0
 
     rewards = []
     steps = []
@@ -111,8 +147,8 @@ def evaluate_agent(agent, grid: Path, sigma: float, start_pos: tuple[int, int] |
             steps.append(step + 1)
             successes += int(terminated)
     finally:
-        if current_epsilon is not None:
-            agent.epsilon = current_epsilon
+        # restore epsilon (even if exception occurs)
+        agent.epsilon = saved_epsilon
 
     return (
         successes / eval_episodes,
@@ -130,6 +166,7 @@ def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
     from world import Environment
 
     set_random_seeds(seed)
+    apply_variant(variant)
 
     env = Environment(
         grid,
@@ -149,10 +186,17 @@ def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
     episode_steps = 0
     episode_rewards: list[float] = []
 
+    visited_positions = {state}
+    current_novelty = dqn_config.NOVELTY_BONUS #to help escape local optima in early training
+
     while timestep < total_timesteps:
         action = agent.take_action(state, grid=env.grid)
         next_state, reward, terminated, info = env.step(action)
         episode_steps += 1
+
+        if(current_novelty > 0 and info.get("agent_moved", False) and next_state not in visited_positions):
+            reward += current_novelty
+            visited_positions.add(next_state)
 
         truncated = episode_steps >= dqn_config.MAX_EPISODE_STEPS
         done = terminated or truncated
@@ -160,6 +204,8 @@ def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
 
         timestep += 1
         episode_reward += reward
+
+        state = next_state #update state
 
         if done:
             episode += 1
@@ -177,8 +223,7 @@ def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
             episode_reward = 0.0
             episode_steps = 0
             state = env.reset()
-        else:
-            state = next_state
+            visited_positions = {state} #reset novelty tracking
 
     success_rate, avg_eval_reward, avg_eval_steps = evaluate_agent(
         agent, grid, sigma, initial_pos, seed, eval_episodes
@@ -210,6 +255,7 @@ def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
             "hidden_size": dqn_config.HIDDEN_SIZE,
             "state_dim": dqn_config.STATE_DIM,
             "action_dim": dqn_config.ACTION_DIM,
+            "novelty_bonus": dqn_config.NOVELTY_BONUS,
             "max_episode_steps": dqn_config.MAX_EPISODE_STEPS,
         },
     }, checkpoint)

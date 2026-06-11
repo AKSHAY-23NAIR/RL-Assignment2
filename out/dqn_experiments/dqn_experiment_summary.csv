@@ -1,0 +1,13 @@
+variant,grid,seed,timesteps,updates,episodes,final_avg_50,success_rate,avg_eval_reward,avg_eval_steps,checkpoint
+full,A1_grid,0,500000,499001,10417,19.6074,1.0,18.552,31.26,out\dqn_experiments\dqn_A1_grid_seed0.pt
+full,A1_grid,1,500000,499001,8386,19.4262,1.0,18.415999999999997,34.14,out\dqn_experiments\dqn_A1_grid_seed1.pt
+full,A1_grid,2,500000,499001,8975,19.0152,1.0,18.612000000000002,31.2,out\dqn_experiments\dqn_A1_grid_seed2.pt
+no_novelty,A1_grid,0,500000,499001,7283,17.859199999999998,1.0,18.592,31.22,out\dqn_experiments\dqn_A1_grid_seed0.pt
+no_novelty,A1_grid,1,500000,499001,8283,17.9792,1.0,18.6288,31.34,out\dqn_experiments\dqn_A1_grid_seed1.pt
+no_novelty,A1_grid,2,500000,499001,1192,12.978799999999968,0.98,17.2692,47.94,out\dqn_experiments\dqn_A1_grid_seed2.pt
+full,restaurant_delivery_grid,0,200000,199001,14761,19.971,1.0,19.619600000000002,10.22,out\dqn_experiments\dqn_restaurant_delivery_grid_seed0.pt
+full,restaurant_delivery_grid,1,200000,199001,13435,19.988799999999998,1.0,19.620400000000004,10.18,out\dqn_experiments\dqn_restaurant_delivery_grid_seed1.pt
+full,restaurant_delivery_grid,2,200000,199001,4319,19.9268,1.0,19.562,10.16,out\dqn_experiments\dqn_restaurant_delivery_grid_seed2.pt
+no_novelty,restaurant_delivery_grid,0,200000,199001,13484,19.4404,1.0,19.5612,10.2,out\dqn_experiments\dqn_restaurant_delivery_grid_seed0.pt
+no_novelty,restaurant_delivery_grid,1,200000,199001,11921,19.4744,1.0,19.562,10.16,out\dqn_experiments\dqn_restaurant_delivery_grid_seed1.pt
+no_novelty,restaurant_delivery_grid,2,200000,199001,15481,19.4644,1.0,19.6192,10.24,out\dqn_experiments\dqn_restaurant_delivery_grid_seed2.pt

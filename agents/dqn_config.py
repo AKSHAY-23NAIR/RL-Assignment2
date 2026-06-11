@@ -7,7 +7,7 @@ These mirror the PPO hyperparameters to allow a fair comparison.
 # Network Architecture
 # Same state representation for a fair comparison with PPO
 HIDDEN_SIZE = 128  #hidden layer width 
-STATE_DIM = 11   # matching match_build_state()
+STATE_DIM = 7   # matching match_build_state()
 ACTION_DIM = 4  # 0:up, 1:down, 2:left, 3:right
 
 # Training Parameters
@@ -27,5 +27,7 @@ BATCH_SIZE = 64 # mini-batch size for training
 WARMUP_STEPS = 1_000 # number of steps to populate the replay buffer before training starts (diversity)
 
 TARGET_UPDATE_FREQ = 500 # how often to update the target network (in steps)
+
+NOVELTY_BONUS = 0.05 #small reward for visitng a new state, encourages exploration in early training
 
 MAX_EPISODE_STEPS = 500 # max steps per episode to prevent infinite loops

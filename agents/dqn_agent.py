@@ -156,10 +156,8 @@ class DQNAgent(BaseAgent):
             1.0 if tc < col else 0.0, # target west
         ], dtype=np.float32)
         
-    def _build_state(self, agent_pos: tuple[int, int], grid: np.ndarray) -> np.ndarray:
+    def _build_state(self, agent_pos, grid):
         """
-        Build the 11-dimensional state vector.
-
         Identical to PPOAgent._build_state() so both agents
         receive the same information to make comparison fair.
 
@@ -171,7 +169,6 @@ class DQNAgent(BaseAgent):
             [4]    sensor east
             [5]    sensor west
             [6]    obstacle density (radius 2)
-            [7-10] target quadrant [N, S, E, W]
 
         All values in [0, 1].
         """
@@ -185,13 +182,11 @@ class DQNAgent(BaseAgent):
         sensor_west = self._get_sensor(grid, row, col, 0, -1)
 
         density = self._get_obstacle_density(grid, row, col)
-        target_quadrant = self._get_target_quadrant(grid, row, col)
 
         return np.array([
             norm_row, norm_col, 
             sensor_north, sensor_south, sensor_east, sensor_west, 
             density,
-            *target_quadrant
         ], dtype=np.float32)
     
     # Action Selection
