@@ -1,9 +1,12 @@
 """
-Run PPO experiments over grids, seeds, and ablation variants.
+Run PPO experiments over grids, seeds, hyperparameters and ablation variants.
 
 Examples:
-    python run_ppo_experiments.py --grids grid_configs/A1_grid.npy grid_configs/restaurant_delivery_grid.npy --iter 200000
-    python run_ppo_experiments.py --variants full no_action_mask no_novelty --seeds 0 1 2
+    python run_ppo_experiments.py --config_names full no_action_mask
+    python run_ppo_experiments.py --group entropy
+    python run_ppo_experiments.py --group gae
+    python run_ppo_experiments.py --group hidden
+    python run_ppo_experiments.py --group ablations
 """
 
 from __future__ import annotations
@@ -37,18 +40,54 @@ BASE_CONFIG: dict[str, Any] = {
     "MAX_EPISODE_STEPS": ppo_config.MAX_EPISODE_STEPS,
 }
 
-VARIANTS: dict[str, dict[str, Any]] = {
+EXPERIMENT_GROUPS = {
+    "ablations": ["full", "no_action_mask", "no_novelty", "long_rollout",],
+    "entropy": ["entropy_0", "entropy_001", "entropy_005",],
+    "gae": ["gae_090", "gae_095", "gae_099",],
+    "clip": ["clip_01", "clip_02", "clip_03",],
+    "hidden": ["hidden_64", "hidden_128", "hidden_256", ]
+}
+
+CONFIGS: dict[str, dict[str, Any]] = {
+    # Ablations
     "full": {},
-    "no_action_mask": {"USE_ACTION_MASKING": False},
-    "no_novelty": {"NOVELTY_BONUS": 0.0},
-    "long_rollout": {"TRAJECTORY_LENGTH": 4096},
+    "no_action_mask": {"USE_ACTION_MASKING": False,},
+    "no_novelty": {"NOVELTY_BONUS": 0.0,},
+    "long_rollout": {"TRAJECTORY_LENGTH": 4096,},
+
+    # Entropy sweep
+    "entropy_0": {"ENTROPY_COEFF": 0.0,},
+    "entropy_001": {"ENTROPY_COEFF": 0.01,},
+    "entropy_005": {"ENTROPY_COEFF": 0.05,},
+
+    # GAE sweep
+    "gae_090": {"GAE_LAMBDA": 0.90,},
+    "gae_095": {"GAE_LAMBDA": 0.95,},
+    "gae_099": {"GAE_LAMBDA": 0.99,},
+
+    # Clip sweep
+    "clip_01": {"EPSILON_CLIP": 0.1,},
+    "clip_02": {"EPSILON_CLIP": 0.2,},
+    "clip_03": {"EPSILON_CLIP": 0.3,},
+
+    # Hidden-size sweep
+    "hidden_64": {"HIDDEN_SIZE": 64,},
+    "hidden_128": {"HIDDEN_SIZE": 128,},
+    "hidden_256": {"HIDDEN_SIZE": 256,},
 }
 
 @dataclass
 class ExperimentResult:
-    variant: str
+    config: str
     grid: str
     seed: int
+
+    entropy_coeff: float
+    gae_lambda: float
+    epsilon_clip: float
+    trajectory_length: int
+    hidden_size: int
+
     timesteps: int
     updates: int
     episodes: int
@@ -63,10 +102,10 @@ def parse_args():
     p.add_argument("--grids", type=Path, nargs="+",
                    default=[Path("grid_configs/A1_grid.npy")],
                    help="Grid files to train/evaluate on.")
-    p.add_argument("--variants", nargs="+", choices=sorted(VARIANTS),
+    p.add_argument("--config_names", nargs="+", choices=sorted(CONFIGS.keys()),
                    default=["full", "no_action_mask", "no_novelty",
                             "long_rollout"],
-                   help="PPO variants/ablations to run.")
+                   help="PPO configurations to run.")
     p.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2],
                    help="Random seeds to run.")
     p.add_argument("--iter", type=int, default=500_000,
@@ -81,6 +120,7 @@ def parse_args():
                    help="Directory for checkpoints and summary CSV.")
     p.add_argument("--log_every", type=int, default=100,
                    help="Print progress every N episodes.")
+    p.add_argument("--group", choices=EXPERIMENT_GROUPS.keys(), default=None,)
     return p.parse_args()
 
 def set_random_seeds(seed: int):
@@ -92,10 +132,13 @@ def set_random_seeds(seed: int):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-def apply_variant(variant: str):
+def apply_config(config_name: str):
+    # restore defaults
     for key, value in BASE_CONFIG.items():
         setattr(ppo_config, key, value)
-    for key, value in VARIANTS[variant].items():
+
+    # apply overrides
+    for key, value in CONFIGS[config_name].items():
         setattr(ppo_config, key, value)
 
     import agents.ppo_agent as ppo_agent_module
@@ -150,7 +193,7 @@ def evaluate_agent(agent, grid: Path, sigma: float, start_pos: tuple[int, int],
         float(np.mean(steps)),
     )
 
-def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
+def train_one(grid: Path, config_name: str, seed: int, total_timesteps: int,
               sigma: float, eval_episodes: int,
               start_pos: tuple[int, int] | None, out_dir: Path,
               log_every: int) -> ExperimentResult:
@@ -158,7 +201,7 @@ def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
     from world import Environment
 
     set_random_seeds(seed)
-    PPOAgent = apply_variant(variant)
+    PPOAgent = apply_config(config_name)
 
     env = Environment(
         grid,
@@ -205,7 +248,7 @@ def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
                 window = episode_rewards[-min(log_every, len(episode_rewards)):]
                 avg_reward = sum(window) / len(window)
                 print(
-                    f"  {variant:>14} | {grid.stem:<28} | seed {seed} | "
+                    f"  {config_name:>14} | {grid.stem:<28} | seed {seed} | "
                     f"step {timestep:>8,} | episode {episode:>5} | "
                     f"avg: {avg_reward:>7.2f} | updates: {agent.update_count}"
                 )
@@ -224,13 +267,13 @@ def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
     )
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    checkpoint = out_dir / f"ppo_{variant}_{grid.stem}_seed{seed}.pt"
+    checkpoint = out_dir / f"ppo_{config_name}_{grid.stem}_seed{seed}.pt"
     torch.save({
         "actor": agent.actor.state_dict(),
         "critic": agent.critic.state_dict(),
         "update_count": agent.update_count,
         "episode_rewards": episode_rewards,
-        "variant": variant,
+        "config_name": config_name,
         "grid": str(grid),
         "seed": seed,
         "sigma": sigma,
@@ -249,18 +292,25 @@ def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
 
     final_avg_50 = float(np.mean(episode_rewards[-50:])) if episode_rewards else 0.0
     return ExperimentResult(
-        variant=variant,
-        grid=grid.stem,
-        seed=seed,
-        timesteps=total_timesteps,
-        updates=agent.update_count,
-        episodes=len(episode_rewards),
-        final_avg_50=final_avg_50,
-        success_rate=success_rate,
-        avg_eval_reward=avg_eval_reward,
-        avg_eval_steps=avg_eval_steps,
-        checkpoint=str(checkpoint),
-    )
+    config=config_name,
+    grid=grid.stem,
+    seed=seed,
+
+    entropy_coeff=ppo_config.ENTROPY_COEFF,
+    gae_lambda=ppo_config.GAE_LAMBDA,
+    epsilon_clip=ppo_config.EPSILON_CLIP,
+    trajectory_length=ppo_config.TRAJECTORY_LENGTH,
+    hidden_size=ppo_config.HIDDEN_SIZE,
+
+    timesteps=total_timesteps,
+    updates=agent.update_count,
+    episodes=len(episode_rewards),
+    final_avg_50=final_avg_50,
+    success_rate=success_rate,
+    avg_eval_reward=avg_eval_reward,
+    avg_eval_steps=avg_eval_steps,
+    checkpoint=str(checkpoint),
+)
 
 def append_results(csv_path: Path, results: list[ExperimentResult]):
     fieldnames = list(ExperimentResult.__dataclass_fields__.keys())
@@ -275,6 +325,10 @@ def append_results(csv_path: Path, results: list[ExperimentResult]):
 
 def main():
     args = parse_args()
+    if args.group:
+        configs_to_run = EXPERIMENT_GROUPS[args.group]
+    else:
+        configs_to_run = args.config_names
     start_pos = parse_start_pos(args.start_pos)
     all_results = []
 
@@ -283,15 +337,15 @@ def main():
             print(f"Skipping missing grid: {grid}")
             continue
 
-        for variant in args.variants:
+        for config_name in configs_to_run:
             for seed in args.seeds:
                 print(
                     f"\nRunning PPO experiment: grid={grid}, "
-                    f"variant={variant}, seed={seed}"
+                    f"config={config_name}, seed={seed}"
                 )
                 result = train_one(
                     grid=grid,
-                    variant=variant,
+                    config_name=config_name,
                     seed=seed,
                     total_timesteps=args.iter,
                     sigma=args.sigma,
@@ -304,7 +358,7 @@ def main():
                 append_results(args.out_dir / "ppo_experiment_summary.csv",
                                [result])
                 print(
-                    f"Finished {variant} / {grid.stem} / seed {seed}: "
+                    f"Finished {config_name} / {grid.stem} / seed {seed}: "
                     f"success={result.success_rate:.2f}, "
                     f"avg_reward={result.avg_eval_reward:.2f}, "
                     f"avg_steps={result.avg_eval_steps:.1f}"

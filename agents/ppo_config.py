@@ -8,14 +8,14 @@ LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 5e-4
 
 # PPO specific
-EPSILON_CLIP = 0.2  # Clipping parameter for PPO objective
+EPSILON_CLIP = 0.3  # Clipping parameter for PPO objective
 EPOCHS_PER_UPDATE = 5  # Number of epochs for policy and value updates
 BATCH_SIZE = 128  # Batch size for updates
 
 # Trajectory collection
 TRAJECTORY_LENGTH = 1024  # Collect this many steps before updating
 GAMMA = 0.99  # Discount factor
-GAE_LAMBDA = 0.95  # Lambda for Generalized Advantage Estimation
+GAE_LAMBDA = 0.90  # Lambda for Generalized Advantage Estimation
 
 # Network architecture
 HIDDEN_SIZE = 128  # Hidden layer size for both actor and critic
