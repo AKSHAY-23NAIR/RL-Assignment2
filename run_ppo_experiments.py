@@ -114,7 +114,7 @@ class ExperimentResult:
 def parse_args():
     p = ArgumentParser(description="Run PPO experiment suite.")
     p.add_argument("--grids", type=Path, nargs="+",
-                   default=[Path("grid_configs/A1_grid.npy"), Path("grid_configs/restaurant_delivery_grid.npy"),],
+                   default=[Path("grid_configs/A1_grid.npy")],
                    help="Grid files to train/evaluate on.")
     p.add_argument("--config_names", nargs="+", choices=sorted(CONFIGS.keys()),
                    default=["full", "no_action_mask", "no_novelty",
