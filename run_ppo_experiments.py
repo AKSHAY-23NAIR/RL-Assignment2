@@ -45,7 +45,9 @@ EXPERIMENT_GROUPS = {
     "entropy": ["entropy_0", "entropy_001", "entropy_005",],
     "gae": ["gae_090", "gae_095", "gae_099",],
     "clip": ["clip_01", "clip_02", "clip_03",],
-    "hidden": ["hidden_64", "hidden_128", "hidden_256", ]
+    "hidden": ["hidden_64", "hidden_128", "hidden_256", ],
+    "lr": ["lr_actor_1e4", "lr_actor_3e4", "lr_actor_1e3"],
+    "discount": ["gamma_090", "gamma_095", "gamma_099"]
 }
 
 CONFIGS: dict[str, dict[str, Any]] = {
@@ -74,6 +76,16 @@ CONFIGS: dict[str, dict[str, Any]] = {
     "hidden_64": {"HIDDEN_SIZE": 64,},
     "hidden_128": {"HIDDEN_SIZE": 128,},
     "hidden_256": {"HIDDEN_SIZE": 256,},
+
+    # Learning rate sweep
+    "lr_actor_1e4": {"LEARNING_RATE_ACTOR": 1e-4,},
+    "lr_actor_3e4": {"LEARNING_RATE_ACTOR": 3e-4,},
+    "lr_actor_1e3": {"LEARNING_RATE_ACTOR": 1e-3,},
+
+    # Discount factor sweep
+    "gamma_090": {"GAMMA": 0.90,},
+    "gamma_095": {"GAMMA": 0.95,},
+    "gamma_099": {"GAMMA": 0.99,},
 }
 
 @dataclass
@@ -87,6 +99,8 @@ class ExperimentResult:
     epsilon_clip: float
     trajectory_length: int
     hidden_size: int
+    learning_rate_actor: float
+    gamma: float
 
     timesteps: int
     updates: int
@@ -301,6 +315,8 @@ def train_one(grid: Path, config_name: str, seed: int, total_timesteps: int,
     epsilon_clip=ppo_config.EPSILON_CLIP,
     trajectory_length=ppo_config.TRAJECTORY_LENGTH,
     hidden_size=ppo_config.HIDDEN_SIZE,
+    learning_rate_actor=ppo_config.LEARNING_RATE_ACTOR,
+    gamma=ppo_config.GAMMA,
 
     timesteps=total_timesteps,
     updates=agent.update_count,

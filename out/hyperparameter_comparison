@@ -1,0 +1,250 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# -------------------------
+# CONFIG
+# -------------------------
+cols = [
+    "variant","grid","seed","timesteps","updates","episodes",
+    "final_avg_50","success_rate","avg_eval_reward","avg_eval_steps",
+    "checkpoint"
+]
+
+# -------------------------
+# ROBUST CSV PARSER
+# -------------------------
+def fix_row(row):
+    # sweep rows may contain extra commas → collapse safely
+    if len(row) > len(cols):
+        return row[:6] + row[-5:]
+    return row
+
+rows = []
+
+with open("./out/ppo_experiments/ppo_experiment_summary.csv", "r", encoding="utf-8") as f:
+    for line in f:
+        parts = line.strip().split(",")
+
+        # skip header or junk
+        if not parts or parts[0] == "variant":
+            continue
+
+        fixed = fix_row(parts)
+
+        if len(fixed) == len(cols):
+            rows.append(fixed)
+
+df = pd.DataFrame(rows, columns=cols)
+
+# -------------------------
+# TYPE CLEANING
+# -------------------------
+numeric_cols = [
+    "timesteps","updates","episodes",
+    "final_avg_50","success_rate",
+    "avg_eval_reward","avg_eval_steps"
+]
+
+for c in numeric_cols:
+    df[c] = pd.to_numeric(df[c], errors="coerce")
+
+df = df.dropna(subset=["success_rate"])
+
+# -------------------------
+# METHOD INFERENCE
+# -------------------------
+# infer from variant name or checkpoint path
+def infer_method(v, ckpt):
+    v = str(v).lower()
+    ckpt = str(ckpt).lower()
+    if "dqn" in ckpt or "dqn" in v:
+        return "DQN"
+    return "PPO"
+
+df["method"] = df.apply(lambda r: infer_method(r["variant"], r["checkpoint"]), axis=1)
+
+# -------------------------
+# HYPERPARAMETER EXTRACTION
+# -------------------------
+def extract_hparam(v):
+    v = str(v)
+
+    # learning rate
+    if "lr_" in v:
+        if "1e4" in v: return ("learning_rate", 1e-4)
+        if "3e4" in v: return ("learning_rate", 3e-4)
+        if "1e3" in v: return ("learning_rate", 1e-3)
+
+    # gamma
+    if "gamma_" in v:
+        try:
+            return ("gamma", float(v.split("_")[1]) / 100)
+        except:
+            pass
+
+    return (None, None)
+
+df[["param","value"]] = df["variant"].apply(
+    lambda x: pd.Series(extract_hparam(x))
+)
+
+df_hp = df.dropna(subset=["param","value"]).copy()
+df_hp = df_hp[df_hp["grid"] == "A1_grid"].copy()
+
+# ensure numeric x-axis stability
+df_hp["value"] = pd.to_numeric(df_hp["value"], errors="coerce")
+df_hp = df_hp.dropna(subset=["value"])
+
+# -------------------------
+# AGGREGATION (FIXED)
+# -------------------------
+def summarize(metric):
+    if df_hp.empty:
+        return pd.DataFrame(columns=["variant","grid","param","value","mean","std","n"])
+
+    return (
+        df_hp
+        .groupby(["method", "grid", "param", "value"])
+        .agg(
+            mean=(metric, "mean"),
+            std=(metric, "std"),
+            n=(metric, "count")
+        )
+        .reset_index()
+    )
+
+success = summarize("success_rate")
+reward  = summarize("avg_eval_reward")
+steps   = summarize("avg_eval_steps")
+
+# -------------------------
+# PRINT SUMMARY
+# -------------------------
+print(df["method"].value_counts())
+print(df["variant"].value_counts().head(20))
+
+print("\n=== SUCCESS RATE ===")
+print(success.to_string(index=False))
+
+print("\n=== REWARD ===")
+print(reward.to_string(index=False))
+
+print("\n=== STEPS ===")
+print(steps.to_string(index=False))
+
+sns.set_theme(style="whitegrid")
+
+metrics = [
+    ("success_rate", "Success Rate (0–1)"),
+    ("avg_eval_reward", "Avg Reward"),
+    ("avg_eval_steps", "Avg Steps")
+]
+
+params = ["learning_rate", "gamma"]
+colors = {"DQN": "#1f77b4", "PPO": "#ff7f0e"}
+
+# -------------------------
+# PRE-COMPUTE GLOBAL Y LIMITS (KEY FIX)
+# -------------------------
+y_lims = {}
+
+for metric, _ in metrics:
+    vals = df_hp[metric].dropna()
+
+    if metric == "success_rate":
+        y_lims[metric] = (0, 1.05)
+
+    elif metric == "avg_eval_reward":
+        pad = (vals.max() - vals.min()) * 0.05
+        y_lims[metric] = (vals.min() - pad, vals.max() + pad)
+
+    elif metric == "avg_eval_steps":
+        pad = (vals.max() - vals.min()) * 0.05
+        y_lims[metric] = (max(0, vals.min() - pad), vals.max() + pad)
+
+# -------------------------
+# PLOTTING (FIXED)
+# -------------------------
+sns.set_theme(style="whitegrid")
+
+metrics = [
+    ("success_rate", "Success Rate (0–1)"),
+    ("avg_eval_reward", "Avg Reward"),
+    ("avg_eval_steps", "Avg Steps")
+]
+
+params = ["learning_rate", "gamma"]
+
+colors = {"DQN": "#1f77b4", "PPO": "#ff7f0e"}
+
+fig, axes = plt.subplots(len(metrics), len(params), figsize=(14, 10))
+
+for i, (metric, label) in enumerate(metrics):
+    for j, param in enumerate(params):
+
+        ax = axes[i, j]
+        sub = df_hp[df_hp["param"] == param].copy()
+
+        sns.barplot(
+            data=sub,
+            x="value",
+            y=metric,
+            hue="method",
+            ax=ax,
+            errorbar=("ci", 95),
+            capsize=0.12,
+            palette=colors
+        )
+
+        ax.set_title(f"{label} vs {param}")
+        ax.set_xlabel(param)
+        ax.set_ylabel(label)
+        ax.tick_params(axis="x", rotation=30)
+
+        # -------------------------
+        # VALUE LABELS (centered)
+        # -------------------------
+        for container in ax.containers:
+            labels = []
+            for bar in container:
+                h = bar.get_height()
+                labels.append("" if np.isnan(h) else f"{h:.2f}")
+
+            ax.bar_label(
+                container,
+                labels=labels,
+                label_type="center",
+                fontsize=9,
+                color="white"
+            )
+
+        # -------------------------
+        # AUTO Y-LIMIT WITH PADDING (FIX FOR CUT-OFF ERROR BARS)
+        # -------------------------
+        y_min, y_max = ax.get_ylim()
+
+        # include error bars (approximation using CI padding)
+        y_range = y_max - y_min
+        padding = max(0.05 * y_range, 0.1 * (1 if metric != "success_rate" else 0.2))
+
+        ax.set_ylim(y_min, y_max + padding)
+
+        # success rate stays clean and bounded
+        if metric == "success_rate":
+            ax.set_ylim(0, 1.05)
+
+        # -------------------------
+        # LEGEND CLEANUP
+        # -------------------------
+        if i == 0 and j == 0:
+            ax.legend(title="Method")
+        else:
+            leg = ax.get_legend()
+            if leg:
+                leg.remove()
+
+plt.tight_layout()
+plt.savefig("./out/hparam_comparison.png", dpi=300, bbox_inches="tight")
+plt.show()

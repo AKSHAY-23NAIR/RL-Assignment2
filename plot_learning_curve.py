@@ -1,10 +1,11 @@
 """
-Plot PPO Learning Curve.
-
-Loads a saved PPO checkpoint and plots the episode rewards over training.
+Plot PPO learning curve averaged over multiple seeds.
 
 Usage:
-    python plot_learning_curve.py out/ppo_example_grid_seed0.pt
+    python plot_learning_curve.py `
+        out/ppo_experiments/ppo_full_A1_grid_seed0.pt `
+        out/ppo_experiments/ppo_full_A1_grid_seed1.pt `
+        out/ppo_experiments/ppo_full_A1_grid_seed2.pt
 """
 
 from argparse import ArgumentParser
@@ -15,18 +16,29 @@ import matplotlib.pyplot as plt
 
 
 def parse_args():
-    p = ArgumentParser(description="Plot PPO learning curve.")
-    p.add_argument("checkpoint", type=Path,
-                   help="Path to the saved .pt checkpoint file.")
-    p.add_argument("--window", type=int, default=50,
-                   help="Rolling average window size (default: 50).")
-    p.add_argument("--out", type=Path, default=None,
-                   help="Path to save the plot. If not set, shows interactively.")
+    p = ArgumentParser(description="Plot averaged PPO learning curve.")
+    p.add_argument(
+        "checkpoints",
+        nargs="+",
+        type=Path,
+        help="Paths to saved .pt checkpoint files."
+    )
+    p.add_argument(
+        "--window",
+        type=int,
+        default=50,
+        help="Rolling average window size (default: 50)."
+    )
+    p.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Path to save plot. If not set, shows interactively."
+    )
     return p.parse_args()
 
 
-def rolling_average(values: list[float], window: int) -> np.ndarray:
-    """Compute rolling average with the given window size."""
+def rolling_average(values, window):
     result = np.zeros(len(values))
     for i in range(len(values)):
         start = max(0, i - window + 1)
@@ -37,37 +49,68 @@ def rolling_average(values: list[float], window: int) -> np.ndarray:
 def main():
     args = parse_args()
 
-    if not args.checkpoint.exists():
-        raise FileNotFoundError(f"Checkpoint not found: {args.checkpoint}")
+    all_rewards = []
 
-    # Load checkpoint
-    checkpoint = torch.load(args.checkpoint, map_location="cpu")
-    episode_rewards = checkpoint.get("episode_rewards", None)
+    for ckpt_path in args.checkpoints:
+        if not ckpt_path.exists():
+            raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
 
-    if episode_rewards is None or len(episode_rewards) == 0:
-        print("No episode rewards found in checkpoint.")
+        checkpoint = torch.load(ckpt_path, map_location="cpu")
+        rewards = checkpoint.get("episode_rewards")
+
+        if rewards is None or len(rewards) == 0:
+            print(f"No rewards found in {ckpt_path}")
+            continue
+
+        print(f"{ckpt_path.name}: {len(rewards)} episodes")
+        all_rewards.append(np.array(rewards))
+
+    if len(all_rewards) == 0:
+        print("No valid reward histories found.")
         return
 
-    print(f"Loaded {len(episode_rewards)} episodes from {args.checkpoint}")
-    print(f"  Min return:  {min(episode_rewards):.1f}")
-    print(f"  Max return:  {max(episode_rewards):.1f}")
-    print(f"  Final avg (last 50): {np.mean(episode_rewards[-50:]):.1f}")
+    # Use shortest run length so all seeds align
+    min_len = min(len(r) for r in all_rewards)
+    all_rewards = np.array([r[:min_len] for r in all_rewards])
 
-    episodes = np.arange(1, len(episode_rewards) + 1)
-    rewards = np.array(episode_rewards)
-    smoothed = rolling_average(episode_rewards, args.window)
+    mean_rewards = np.mean(all_rewards, axis=0)
+    std_rewards = np.std(all_rewards, axis=0)
+
+    smoothed = rolling_average(mean_rewards, args.window)
+    episodes = np.arange(1, min_len + 1)
 
     # Plot
     fig, ax = plt.subplots(figsize=(10, 5))
 
-    ax.plot(episodes, rewards, color="steelblue", alpha=0.3, linewidth=0.8,
-            label="Episode return")
-    ax.plot(episodes, smoothed, color="steelblue", linewidth=2,
-            label=f"Rolling avg (window={args.window})")
+    # Mean return
+    ax.plot(
+        episodes,
+        mean_rewards,
+        alpha=0.3,
+        linewidth=1,
+        label="Mean episode return"
+    )
+
+    # ±1 std region
+    ax.fill_between(
+        episodes,
+        mean_rewards - std_rewards,
+        mean_rewards + std_rewards,
+        alpha=0.2,
+        label="±1 std"
+    )
+
+    # Smoothed mean
+    ax.plot(
+        episodes,
+        smoothed,
+        linewidth=2,
+        label=f"Rolling avg (window={args.window})"
+    )
 
     ax.set_xlabel("Episode")
     ax.set_ylabel("Return")
-    ax.set_title(f"PPO Learning Curve — {args.checkpoint.stem}")
+    ax.set_title(f"PPO Learning Curve ({len(all_rewards)} seeds)")
     ax.legend()
     ax.grid(True, alpha=0.3)
 
