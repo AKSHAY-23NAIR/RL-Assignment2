@@ -36,7 +36,7 @@ from agents.dqn_config import (
 )
 
 class DQNAgent(BaseAgent):
-    def __init__(self, grid_shape: tuple[int, int]):
+    def __init__(self, grid_shape: tuple[int, int], learning_rate=None, gamma=None, hidden_size=None):
         """
         Initialize DQN agent 
         Args: 
@@ -44,16 +44,21 @@ class DQNAgent(BaseAgent):
             used to normalising position features and casting sensor rays
         """
         super().__init__()
+        import agents.dqn_config as dqn_config
 
         self.grid_rows = grid_shape[0]
         self.grid_cols = grid_shape[1]
+
+        lr = learning_rate if learning_rate is not None else dqn_config.LEARNING_RATE
+        self.gamma = gamma if gamma is not None else dqn_config.GAMMA
+        hidden = hidden_size if hidden_size is not None else dqn_config.HIDDEN_SIZE
 
         #-- Device --
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         #-- Networks --
         #trained every step, approx Q(s,a) for current policy and SELECT action
-        self.policy_net = DQNNetwork(STATE_DIM, ACTION_DIM, HIDDEN_SIZE).to(self.device)
+        self.policy_net = DQNNetwork(dqn_config.STATE_DIM, dqn_config.ACTION_DIM, hidden).to(self.device)
 
         # Target Network:
         # and identical but frozen copy of policy_net, 
@@ -62,7 +67,7 @@ class DQNAgent(BaseAgent):
         #without target network, both Q(s,a) and target Q(s',a') would change every step, leading to unstable training and divergence
         #by freezing the target network and updating only every TARGET_UPDATE_FREQ steps,
         #target stays stable for a while, so that training can converge towards it before it moves again
-        self.target_net = DQNNetwork(STATE_DIM, ACTION_DIM, HIDDEN_SIZE).to(self.device)
+        self.target_net = DQNNetwork(dqn_config.STATE_DIM,dqn_config. ACTION_DIM, hidden).to(self.device)
 
         self.target_net.load_state_dict(self.policy_net.state_dict()) # initialize target net with same weights as policy net
 
@@ -70,7 +75,7 @@ class DQNAgent(BaseAgent):
 
         #-- Optimizer --
         #Adam adapts to the learning rate per parameter 
-        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=LEARNING_RATE)
+        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
 
         self.loss_fn = nn.SmoothL1Loss() # Huber loss, less sensitive to outliers than MSE, more stable training in early stages
 
@@ -278,7 +283,7 @@ class DQNAgent(BaseAgent):
         with torch.no_grad():
             q_next_max = self.target_net(next_states_t).max(dim=1)[0] # shape (batch_size,)
 
-        q_target = rewards_t + (GAMMA * q_next_max * (1 - dones_t)) # shape (batch_size,)
+        q_target = rewards_t + (self.gamma * q_next_max * (1 - dones_t)) # shape (batch_size,)
 
         # Compute loss
         loss = self.loss_fn(q_current, q_target)
