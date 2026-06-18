@@ -1,12 +1,10 @@
-"""Neural Network Components for PPO.
-
-Actor (policy) and Critic (value) networks.
+"""
+Neural Network for PPO.
 """
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 
 class ActorNetwork(nn.Module):
     """Policy network that outputs action probabilities."""
@@ -26,10 +24,8 @@ class ActorNetwork(nn.Module):
         
     def forward(self, state: torch.Tensor) -> torch.Tensor:
         """Forward pass through the network.
-        
         Args:
             state: Input state tensor.
-            
         Returns:
             Action logits.
         """
@@ -44,7 +40,6 @@ class CriticNetwork(nn.Module):
     
     def __init__(self, state_dim: int, hidden_size: int = 128):
         """Initialize the critic network.
-        
         Args:
             state_dim: Dimension of the state space.
             hidden_size: Size of hidden layers.
@@ -56,10 +51,8 @@ class CriticNetwork(nn.Module):
         
     def forward(self, state: torch.Tensor) -> torch.Tensor:
         """Forward pass through the network.
-        
         Args:
             state: Input state tensor.
-            
         Returns:
             State value.
         """

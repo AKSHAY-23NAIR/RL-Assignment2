@@ -1,5 +1,4 @@
-"""PPO Configuration.
-
+"""
 Hyperparameters and settings for Proximal Policy Optimization.
 """
 
@@ -15,15 +14,15 @@ BATCH_SIZE = 128  # Batch size for updates
 # Trajectory collection
 TRAJECTORY_LENGTH = 1024  # Collect this many steps before updating
 GAMMA = 0.99  # Discount factor
-GAE_LAMBDA = 0.90  # Lambda for Generalized Advantage Estimation
+GAE_LAMBDA = 0.90  # Lambda for GAE
 
 # Network architecture
 HIDDEN_SIZE = 128  # Hidden layer size for both actor and critic
-STATE_DIM = 7  # Continuous sensor-based state vector
+STATE_DIM = 7
 ACTION_DIM = 4  # 4 possible actions: up, down, left, right
 
 # Exploration
-ENTROPY_COEFF = 0.02
+ENTROPY_COEFF = 0.02 # Encourages exploration
 NOVELTY_BONUS = 0.02  # Training-only reward for first visit to a cell per episode
 USE_ACTION_MASKING = True
 

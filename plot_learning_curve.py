@@ -6,6 +6,11 @@ Usage:
         out/ppo_experiments/ppo_full_A1_grid_seed0.pt `
         out/ppo_experiments/ppo_full_A1_grid_seed1.pt `
         out/ppo_experiments/ppo_full_A1_grid_seed2.pt
+
+    python plot_learning_curve.py `
+        out/ppo_experiments/ppo_full_restaurant_delivery_grid_seed0.pt `
+        out/ppo_experiments/ppo_full_restaurant_delivery_grid_seed1.pt `
+        out/ppo_experiments/ppo_full_restaurant_delivery_grid_seed2.pt
 """
 
 from argparse import ArgumentParser
