@@ -44,6 +44,7 @@ def parse_args():
 
 
 def rolling_average(values, window):
+    # calculate rolling average
     result = np.zeros(len(values))
     for i in range(len(values)):
         start = max(0, i - window + 1)
