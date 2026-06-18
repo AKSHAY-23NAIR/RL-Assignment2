@@ -1,7 +1,4 @@
-"""Proximal Policy Optimization Agent.
-
-Implementation of PPO for the grid navigation task.
-"""
+"""Proximal Policy Optimization Agent."""
 
 import torch
 import torch.nn as nn
@@ -37,10 +34,8 @@ class PPOAgent(BaseAgent):
         self.critic = CriticNetwork(STATE_DIM, HIDDEN_SIZE).to(self.device)
         
         # Optimizers
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), 
-                                         lr=LEARNING_RATE_ACTOR)
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), 
-                                          lr=LEARNING_RATE_CRITIC)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=LEARNING_RATE_ACTOR)
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=LEARNING_RATE_CRITIC)
         
         # Trajectory storage
         self.states = deque(maxlen=TRAJECTORY_LENGTH)
@@ -63,8 +58,8 @@ class PPOAgent(BaseAgent):
         nothing found within max_range steps.
 
         Args:
-            grid:      Current grid array.
-            row, col:  Agent position.
+            grid: Current grid array.
+            row, col: Agent position.
             d_row, d_col: Unit direction vector.
             max_range: Maximum number of cells to look ahead.
         """
@@ -115,8 +110,7 @@ class PPOAgent(BaseAgent):
             [4]  sensor facing east   (right, d_col=+1)
             [5]  sensor facing west   (left,  d_col=-1)
             [6]  local obstacle density (radius-2 neighbourhood)
-
-        All values are in [0, 1].
+        All values are [0, 1].
 
         Args:
             agent_pos: (row, col) tuple.
