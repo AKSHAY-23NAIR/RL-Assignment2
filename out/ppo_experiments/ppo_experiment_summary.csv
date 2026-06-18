@@ -1,6 +1,4 @@
 variant,grid,seed,timesteps,updates,episodes,final_avg_50,success_rate,avg_eval_reward,avg_eval_steps,checkpoint
-full,A1_grid,0,200000,196,514,1.5792000000000757,0.35,-6.782999999999876,393.05,out\ppo_experiments\ppo_full_A1_grid_seed0.pt
-full,A1_grid,0,200000,196,514,1.5792000000000757,0.32,-8.393599999999877,414.64,out\ppo_experiments\ppo_full_A1_grid_seed0.pt
 full,A1_grid,0,500000,489,1600,9.607200000000036,1.0,18.578400000000002,30.92,out\ppo_experiments\ppo_full_A1_grid_seed0.pt
 full,A1_grid,1,500000,489,1613,10.328400000000038,1.0,18.52,30.9,out\ppo_experiments\ppo_full_A1_grid_seed1.pt
 full,A1_grid,2,500000,489,1640,7.536400000000036,1.0,18.5784,30.92,out\ppo_experiments\ppo_full_A1_grid_seed2.pt
@@ -101,3 +99,7 @@ gamma_095,A1_grid,2,0.02,0.9,0.3,1024,128,0.0001,0.95,500000,489,1282,0.56040000
 gamma_099,A1_grid,0,0.02,0.9,0.3,1024,128,0.0001,0.99,500000,489,3480,15.683200000000005,1.0,18.5576,30.98,out\ppo_experiments\ppo_gamma_099_A1_grid_seed0.pt
 gamma_099,A1_grid,1,0.02,0.9,0.3,1024,128,0.0001,0.99,500000,489,3417,14.791200000000009,1.0,18.576800000000002,31.0,out\ppo_experiments\ppo_gamma_099_A1_grid_seed1.pt
 gamma_099,A1_grid,2,0.02,0.9,0.3,1024,128,0.0001,0.99,500000,489,3441,14.881200000000005,1.0,18.4992,30.96,out\ppo_experiments\ppo_gamma_099_A1_grid_seed2.pt
+full,A1_grid,0,0.02,0.9,0.3,1024,128,0.0001,0.99,1000000,977,8376,15.530400000000004,1.0,18.578400000000002,30.92,out\ppo_experiments\ppo_full_A1_grid_seed0.pt
+full,A1_grid,0,0.02,0.9,0.3,1024,128,0.0001,0.99,1000000,977,8376,15.530400000000004,1.0,18.578400000000002,30.92,out\ppo_experiments\ppo_full_A1_grid_seed0.pt
+full,A1_grid,1,0.02,0.9,0.3,1024,128,0.0001,0.99,1000000,977,8298,16.256000000000007,1.0,13.031200000000021,125.02,out\ppo_experiments\ppo_full_A1_grid_seed1.pt
+full,A1_grid,2,0.02,0.9,0.3,1024,128,0.0001,0.99,1000000,977,8471,14.894000000000005,1.0,18.597599999999996,30.94,out\ppo_experiments\ppo_full_A1_grid_seed2.pt

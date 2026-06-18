@@ -2,7 +2,9 @@
 Run PPO experiments over grids, seeds, hyperparameters and ablation variants.
 
 Examples:
+Specific variant:
     python run_ppo_experiments.py --config_names full no_action_mask
+Group sweep:    
     python run_ppo_experiments.py --group entropy
     python run_ppo_experiments.py --group gae
     python run_ppo_experiments.py --group hidden
@@ -18,10 +20,11 @@ import importlib
 import random
 from typing import Any
 import numpy as np
-
+import torch
 import agents.ppo_config as ppo_config
 from reward_functions import shaped_reward
 
+# Default PPO configuration values.
 BASE_CONFIG: dict[str, Any] = {
     "LEARNING_RATE_ACTOR": ppo_config.LEARNING_RATE_ACTOR,
     "LEARNING_RATE_CRITIC": ppo_config.LEARNING_RATE_CRITIC,
@@ -40,6 +43,7 @@ BASE_CONFIG: dict[str, Any] = {
     "MAX_EPISODE_STEPS": ppo_config.MAX_EPISODE_STEPS,
 }
 
+# Named groups of experiments used by the --group argument.
 EXPERIMENT_GROUPS = {
     "ablations": ["full", "no_action_mask", "no_novelty", "long_rollout",],
     "entropy": ["entropy_0", "entropy_001", "entropy_005",],
@@ -50,6 +54,7 @@ EXPERIMENT_GROUPS = {
     "discount": ["gamma_090", "gamma_095", "gamma_099"]
 }
 
+# Hyperparameter overrides for each experiment configuration.
 CONFIGS: dict[str, dict[str, Any]] = {
     # Ablations
     "full": {},
@@ -90,6 +95,7 @@ CONFIGS: dict[str, dict[str, Any]] = {
 
 @dataclass
 class ExperimentResult:
+    """Summary statistics for one PPO training run."""
     config: str
     grid: str
     seed: int
@@ -111,6 +117,7 @@ class ExperimentResult:
     avg_eval_steps: float
     checkpoint: str
 
+# Parse command-line arguments.
 def parse_args():
     p = ArgumentParser(description="Run PPO experiment suite.")
     p.add_argument("--grids", type=Path, nargs="+",
@@ -138,8 +145,7 @@ def parse_args():
     return p.parse_args()
 
 def set_random_seeds(seed: int):
-    import torch
-
+    # Set random seeds across used libaries for reproducibility.
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -147,11 +153,11 @@ def set_random_seeds(seed: int):
         torch.cuda.manual_seed_all(seed)
 
 def apply_config(config_name: str):
-    # restore defaults
+    # restore default config
     for key, value in BASE_CONFIG.items():
         setattr(ppo_config, key, value)
 
-    # apply overrides
+    # apply experiment hyperparameter changes
     for key, value in CONFIGS[config_name].items():
         setattr(ppo_config, key, value)
 
@@ -173,6 +179,8 @@ def evaluate_agent(agent, grid: Path, sigma: float, start_pos: tuple[int, int],
     successes = 0
 
     for episode_idx in range(eval_episodes):
+        # Use different seeds for evaluation episodes to avoid
+        # evaluating on identical trajectories.
         eval_env = Environment(
             grid,
             no_gui=True,
@@ -238,14 +246,17 @@ def train_one(grid: Path, config_name: str, seed: int, total_timesteps: int,
     visited_positions = {state}
 
     while timestep < total_timesteps:
+         # Sample action from the current policy
         action = agent.take_action(state, grid=env.grid)
         state, reward, terminated, info = env.step(action)
         episode_steps += 1
 
+        # Reward first-time visits to states to encourage exploration
         if info["agent_moved"] and state not in visited_positions:
             reward += ppo_config.NOVELTY_BONUS
             visited_positions.add(state)
 
+        # Terminate episode if max steps reached, or if goal reached
         truncated = episode_steps >= ppo_config.MAX_EPISODE_STEPS
         done = terminated or truncated
         agent.update(state, reward, action, done=done, grid=env.grid)

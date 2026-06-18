@@ -17,7 +17,7 @@ def default_reward(grid, agent_pos) -> float:
 
 
 def shaped_reward(grid, agent_pos) -> float:
-    """Scaled reward for PPO training."""
+    """Scaled reward."""
     match grid[agent_pos]:
         case 0:
             return -0.02
