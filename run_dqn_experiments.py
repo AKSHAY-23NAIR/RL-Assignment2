@@ -40,17 +40,38 @@ BASE_CONFIG: dict[str, Any] = {
     "MAX_EPISODE_STEPS":  dqn_config.MAX_EPISODE_STEPS,
 }
 
-VARIANTS: dict[str, dict[str, Any]] = {
+EXPERIMENT_GROUPS = {
+    "ablations": ["full", "no_novelty"],
+    "hidden": ["hidden_64", "hidden_128", "hidden_256"],
+    "lr": ["lr_1e4", "lr_3e4", "lr_1e3"],
+    "discount": ["gamma_090", "gamma_095", "gamma_099"],
+}
+
+CONFIGS: dict[str, dict[str, Any]] = {
     "full": {},
     "no_novelty": {"NOVELTY_BONUS": 0.0}, #to test if exploration bonus helps DQN 
+    "hidden_64": {"HIDDEN_SIZE": 64},
+    "hidden_128": {"HIDDEN_SIZE": 128},
+    "hidden_256": {"HIDDEN_SIZE": 256},
+    "lr_1e4": {"LEARNING_RATE": 1e-4},
+    "lr_3e4": {"LEARNING_RATE": 3e-4},
+    "lr_1e3": {"LEARNING_RATE": 1e-3},
+    "gamma_090": {"GAMMA": 0.90},
+    "gamma_095": {"GAMMA": 0.95},
+    "gamma_099": {"GAMMA": 0.99},
     "high_sigma": {}, #high stochasticity robustness test, sigma is set at environment level but document here 
 }
 
 @dataclass
 class ExperimentResult:
-    variant: str
+    config: str
     grid: str
     seed: int
+
+    hidden_size: int
+    learning_rate: float
+    gamma: float
+
     timesteps: int
     updates: int
     episodes: int
@@ -65,7 +86,7 @@ def parse_args():
     p.add_argument("--grids", type=Path, nargs="+",
                    default=[Path("grid_configs/A1_grid.npy")],
                    help="Grid files to train/evaluate on.")
-    p.add_argument("--variants", nargs="+", choices=sorted(VARIANTS), 
+    p.add_argument("--config_names", nargs="+", choices=sorted(CONFIGS.keys()), 
                    default=["full", "no_novelty"], 
                    help="DQN variants/ablations to run.")
 
@@ -73,7 +94,7 @@ def parse_args():
                    help="Random seeds to run.")
     p.add_argument("--iter", type=int, default=500_000,
                    help="Training timesteps per run.")
-    p.add_argument("--sigma", type=float, default=0.1,
+    p.add_argument("--sigma", type=float, default=0.02,
                    help="Environment stochasticity.")
     p.add_argument("--eval_episodes", type=int, default=50,
                    help="Evaluation episodes per trained model.")
@@ -83,6 +104,7 @@ def parse_args():
                    help="Directory for checkpoints and summary CSV.")
     p.add_argument("--log_every", type=int, default=100,
                    help="Print progress every N episodes.")
+    p.add_argument("--group", choices=EXPERIMENT_GROUPS.keys(), default=None)
     return p.parse_args()
 
 
@@ -95,12 +117,12 @@ def set_random_seeds(seed: int):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-def apply_variant(variant: str):
+def apply_config(config_name: str):
     # reset to base
     for key, value in BASE_CONFIG.items():
         setattr(dqn_config, key, value)
     # apply overrides
-    for key, value in VARIANTS[variant].items():
+    for key, value in CONFIGS[config_name].items():
         setattr(dqn_config, key, value)
 
 def parse_start_pos(raw: str | None) -> tuple[int, int] | None:
@@ -157,7 +179,7 @@ def evaluate_agent(agent, grid: Path, sigma: float, start_pos: tuple[int, int] |
     )
 
 
-def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
+def train_one(grid: Path, config_name: str, seed: int, total_timesteps: int,
               sigma: float, eval_episodes: int,
               start_pos: tuple[int, int] | None, out_dir: Path,
               log_every: int) -> ExperimentResult:
@@ -166,7 +188,7 @@ def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
     from world import Environment
 
     set_random_seeds(seed)
-    apply_variant(variant)
+    apply_config(config_name)
 
     env = Environment(
         grid,
@@ -215,9 +237,10 @@ def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
                 window = episode_rewards[-min(log_every, len(episode_rewards)):]
                 avg_reward = sum(window) / len(window)
                 print(
-                    f"  {variant:>14} | {grid.stem:<28} | seed {seed} | "
+                    f"  {config_name:>14} | {grid.stem:<28} | seed {seed} | "
                     f"step {timestep:>8,} | episode {episode:>5} | "
-                    f"avg: {avg_reward:>7.2f} | updates: {agent.update_count}"
+                    f"avg: {avg_reward:>7.2f} | ε: {agent.epsilon:.3f} | "
+                    f"| updates: {agent.update_count}"
                 )
 
             episode_reward = 0.0
@@ -230,7 +253,7 @@ def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
     )
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    checkpoint = out_dir / f"dqn_{grid.stem}_seed{seed}.pt"
+    checkpoint = out_dir / f"dqn_{config_name}_{grid.stem}_seed{seed}.pt"
     torch.save({
         "policy_net": agent.policy_net.state_dict(),
         "target_net": agent.target_net.state_dict(),
@@ -238,33 +261,27 @@ def train_one(grid: Path, variant: str, seed: int, total_timesteps: int,
         "steps_done": agent.steps_done,
         "update_count": agent.update_count,
         "episode_rewards": episode_rewards,
-        "variant": variant,
+        "config_name": config_name,
         "grid": str(grid),
         "seed": seed,
         "sigma": sigma,
         "config": {
             "learning_rate": dqn_config.LEARNING_RATE,
             "gamma": dqn_config.GAMMA,
-            "epsilon_start": dqn_config.EPSILON_START,
-            "epsilon_end": dqn_config.EPSILON_END,
-            "epsilon_decay": dqn_config.EPSILON_DECAY,
-            "buffer_size": dqn_config.BUFFER_SIZE,
-            "batch_size": dqn_config.BATCH_SIZE,
-            "warmup_steps": dqn_config.WARMUP_STEPS,
-            "target_update_freq": dqn_config.TARGET_UPDATE_FREQ,
             "hidden_size": dqn_config.HIDDEN_SIZE,
-            "state_dim": dqn_config.STATE_DIM,
-            "action_dim": dqn_config.ACTION_DIM,
             "novelty_bonus": dqn_config.NOVELTY_BONUS,
-            "max_episode_steps": dqn_config.MAX_EPISODE_STEPS,
+            "state_dim": dqn_config.STATE_DIM,
         },
     }, checkpoint)
 
     final_avg_50 = float(np.mean(episode_rewards[-50:])) if episode_rewards else 0.0
     return ExperimentResult(
-        variant=variant,
+        config=config_name,
         grid=grid.stem,
         seed=seed,
+        hidden_size=dqn_config.HIDDEN_SIZE,
+        learning_rate=dqn_config.LEARNING_RATE,
+        gamma=dqn_config.GAMMA,
         timesteps=total_timesteps,
         updates=agent.update_count,
         episodes=len(episode_rewards),
@@ -290,23 +307,28 @@ def append_results(csv_path: Path, results: list[ExperimentResult]):
 
 def main():
     args = parse_args()
+    configs_to_run = EXPERIMENT_GROUPS[args.group] if args.group else args.config_names
     start_pos = parse_start_pos(args.start_pos)
     all_results = []
 
+    if args.group:
+        summary_filename = f"dqn_sweep_{args.group}_summary.csv"
+    else:
+        summary_filename = "dqn_experiment_summary.csv"
     for grid in args.grids:
         if not grid.exists():
             print(f"Skipping missing grid: {grid}")
             continue
 
-        for variant in args.variants:
+        for config_name in configs_to_run:
             for seed in args.seeds:
                 print(
-                    f"\nRunning DQN experiment: grid={grid}, "
-                    f"variant={variant}, seed={seed}"
+                    f"\nRunning DQN experiment: grid={grid.stem}, "
+                    f"config={config_name}, seed={seed}"
                 )
                 result = train_one(
                     grid=grid,
-                    variant=variant,
+                    config_name=config_name,
                     seed=seed,
                     total_timesteps=args.iter,
                     sigma=args.sigma,
@@ -316,17 +338,17 @@ def main():
                     log_every=args.log_every,
                 )
                 all_results.append(result)
-                append_results(args.out_dir / "dqn_experiment_summary.csv",
+                append_results(args.out_dir / summary_filename,
                                [result])
                 print(
-                    f"Finished {variant} / {grid.stem} / seed {seed}: "
+                    f"Finished {config_name} / {grid.stem} / seed {seed}: "
                     f"success={result.success_rate:.2f}, "
                     f"avg_reward={result.avg_eval_reward:.2f}, "
                     f"avg_steps={result.avg_eval_steps:.1f}"
                 )
 
     if all_results:
-        print(f"\nSaved summary to {args.out_dir / 'dqn_experiment_summary.csv'}")
+        print(f"\nSaved summary to {args.out_dir / summary_filename}")
     else:
         print("\nNo experiments were run.")
 

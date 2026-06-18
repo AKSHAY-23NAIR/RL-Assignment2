@@ -1,0 +1,10 @@
+config,grid,seed,hidden_size,learning_rate,gamma,timesteps,updates,episodes,final_avg_50,success_rate,avg_eval_reward,avg_eval_steps,checkpoint
+gamma_090,restaurant_delivery_grid,0,128,0.001,0.9,100000,99001,308,-4.873599999999922,0.0,-10.568399999999874,500.0,out\dqn_experiments\dqn_gamma_090_restaurant_delivery_grid_seed0.pt
+gamma_090,restaurant_delivery_grid,1,128,0.001,0.9,100000,99001,462,20.128599999999995,1.0,19.816800000000004,9.18,out\dqn_experiments\dqn_gamma_090_restaurant_delivery_grid_seed1.pt
+gamma_090,restaurant_delivery_grid,2,128,0.001,0.9,100000,99001,6550,20.175599999999996,1.0,19.816800000000004,9.18,out\dqn_experiments\dqn_gamma_090_restaurant_delivery_grid_seed2.pt
+gamma_095,restaurant_delivery_grid,0,128,0.001,0.95,100000,99001,308,-4.873599999999922,0.0,-10.568399999999874,500.0,out\dqn_experiments\dqn_gamma_095_restaurant_delivery_grid_seed0.pt
+gamma_095,restaurant_delivery_grid,1,128,0.001,0.95,100000,99001,462,20.128599999999995,1.0,19.816800000000004,9.18,out\dqn_experiments\dqn_gamma_095_restaurant_delivery_grid_seed1.pt
+gamma_095,restaurant_delivery_grid,2,128,0.001,0.95,100000,99001,6550,20.175599999999996,1.0,19.816800000000004,9.18,out\dqn_experiments\dqn_gamma_095_restaurant_delivery_grid_seed2.pt
+gamma_099,restaurant_delivery_grid,0,128,0.001,0.99,100000,99001,308,-4.873599999999922,0.0,-10.568399999999874,500.0,out\dqn_experiments\dqn_gamma_099_restaurant_delivery_grid_seed0.pt
+gamma_099,restaurant_delivery_grid,1,128,0.001,0.99,100000,99001,462,20.128599999999995,1.0,19.816800000000004,9.18,out\dqn_experiments\dqn_gamma_099_restaurant_delivery_grid_seed1.pt
+gamma_099,restaurant_delivery_grid,2,128,0.001,0.99,100000,99001,6550,20.175599999999996,1.0,19.816800000000004,9.18,out\dqn_experiments\dqn_gamma_099_restaurant_delivery_grid_seed2.pt
