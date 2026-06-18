@@ -200,7 +200,7 @@ def train_one(grid: Path, config_name: str, seed: int, total_timesteps: int,
     )
     state = env.reset()
     initial_pos = env.agent_pos
-    agent = DQNAgent(grid_shape=env.grid.shape)
+    agent = DQNAgent(grid_shape=env.grid.shape, learning_rate=dqn_config.LEARNING_RATE, gamma=dqn_config.GAMMA, hidden_size=dqn_config.HIDDEN_SIZE,)
 
     timestep = 0
     episode = 0
