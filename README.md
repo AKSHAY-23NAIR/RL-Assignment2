@@ -1,3 +1,47 @@
+Reinforcement Learning - Assignment 2
+
+This repository contains a Reinforcement Learning implementation of restaurant delivery setup using a robot. This includes a DQN baseline and a PPO agent on top of it. This README provides a comprehensive description on how to run the various experiments.
+
+## File structure
+
+```text
+agents/
+  dqn_agent.py
+  dqn_config.py
+  dqn_network.py
+  dqn_replay_buffer.py
+  ppo_agent.py
+  ppo_config.py
+  neural_network.py
+
+grid_configs/
+  A1_grid.npy
+  restaurant_delivery_grid.npy
+  example_grid.npy
+
+world/
+  environment.py
+  grid.py
+  gui.py
+  grid_creator.py
+
+train_dqn.py
+train_ppo.py
+run_dqn_experiments.py
+run_ppo_experiments.py
+plot_learning_curve.py
+ppo_plots.py
+reward_functions.py
+```
+
+
+
+
+
+
+
+
+
 
 Welcome to Data Intelligence Challenge-2AMC15!
 This is the repository containing the challenge environment code.
