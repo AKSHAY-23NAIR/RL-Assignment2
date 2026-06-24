@@ -137,7 +137,7 @@ out/ppo_experiments/
 
 ## Plots
 
-To plot learning curves from the saved checkpoints in this project use the following command (for PPO in A1 grid here in this case over 3 seeds):
+To plot learning curves from the saved checkpoints in this project use the following command (in this case for PPO on the A1 grid, using 3 seeds):
 ```bash
 python plot_learning_curve.py out/ppo_experiments/ppo_full_A1_grid_seed0.pt out/ppo_experiments/ppo_full_A1_grid_seed1.pt out/ppo_experiments/ppo_full_A1_grid_seed2.pt
 ```
