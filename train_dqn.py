@@ -117,11 +117,6 @@ def main(grid_paths: list[Path], no_gui: bool, total_timesteps: int, fps: int,
                 state = env.reset()
                 visited_positions = {state}
 
-        # NOTE: not needed, trains every step in the update() method.
-        # if len(agent.states) > 0:
-        #     next_value = 0.0 if last_done else agent._state_value(state, env.grid)
-        #     agent._ppo_update(next_value=next_value)
-
         print(f"\nTraining complete. Total episodes: {episode}, "
               f"DQN updates: {agent.update_count}")
 
