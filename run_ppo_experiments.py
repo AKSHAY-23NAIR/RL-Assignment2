@@ -23,6 +23,7 @@ import numpy as np
 import torch
 import agents.ppo_config as ppo_config
 from reward_functions import shaped_reward
+from world import Environment
 
 # Default PPO configuration values.
 BASE_CONFIG: dict[str, Any] = {
@@ -172,7 +173,6 @@ def parse_start_pos(raw: str | None) -> tuple[int, int] | None:
 
 def evaluate_agent(agent, grid: Path, sigma: float, start_pos: tuple[int, int],
                    seed: int, eval_episodes: int) -> tuple[float, float, float]:
-    from world import Environment
 
     rewards = []
     steps = []
@@ -219,8 +219,6 @@ def train_one(grid: Path, config_name: str, seed: int, total_timesteps: int,
               sigma: float, eval_episodes: int,
               start_pos: tuple[int, int] | None, out_dir: Path,
               log_every: int) -> ExperimentResult:
-    import torch
-    from world import Environment
 
     set_random_seeds(seed)
     PPOAgent = apply_config(config_name)

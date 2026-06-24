@@ -15,9 +15,10 @@ import csv
 import random
 from typing import Any
 import numpy as np
-
 import agents.dqn_config as dqn_config
 from reward_functions import shaped_reward
+from agents.dqn_agent import DQNAgent
+from world import Environment
 
 #Ablation variants
 #Each variant changes one thing from full config
@@ -134,7 +135,6 @@ def parse_start_pos(raw: str | None) -> tuple[int, int] | None:
 
 def evaluate_agent(agent, grid: Path, sigma: float, start_pos: tuple[int, int] | None,
                    seed: int, eval_episodes: int) -> tuple[float, float, float]:
-    from world import Environment
 
     # disable exploration during evaluation
     saved_epsilon = agent.epsilon
@@ -182,10 +182,7 @@ def evaluate_agent(agent, grid: Path, sigma: float, start_pos: tuple[int, int] |
 def train_one(grid: Path, config_name: str, seed: int, total_timesteps: int,
               sigma: float, eval_episodes: int,
               start_pos: tuple[int, int] | None, out_dir: Path,
-              log_every: int) -> ExperimentResult:
-    import torch
-    from agents.dqn_agent import DQNAgent
-    from world import Environment
+              log_every: int) -> ExperimentResult:    
 
     set_random_seeds(seed)
     apply_config(config_name)
